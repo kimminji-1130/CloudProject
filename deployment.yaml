@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-deployment
+  namespace: django-app
+  annotations:
+    kubectl.kubernetes.io/restartedAt: "{{ now }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django
+  template:
+    metadata:
+      labels:
+        app: django
+    spec:
+      containers:
+        - name: django-container
+          image: my-django-app
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: my-secret
+            - configMapRef:
+                name: my-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: django-secret
+                  key: DB_PASSWORD
+            - name: DEBUG
+              valueFrom:
+                configMapKeyRef:
+                  name: django-configmap
+                  key: DEBUG
+            - name: APP_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: django-configmap
+                  key: APP_MODE
+          readinessProbe:
+            httpGet:
+              path: /healthz/
+              port: 8000
+            initialDelaySeconds: 5  # Pod 시작 후 5초 대기
+            periodSeconds: 5        # 매 5초마다 검사
+            failureThreshold: 3      # 3번 실패 시 서비스에서 제외
+          livenessProbe:
+            httpGet:
+              path: /healthz/
+              port: 8000
+            initialDelaySeconds: 10  # 10초 대기 후 시작
+            periodSeconds: 10        # 매 10초마다 검사
+            failureThreshold: 3      # 3번 실패 시 재시작
+          startupProbe:
+            httpGet:
+              path: /healthz/
+              port: 8000
+            initialDelaySeconds: 10  # 10초 대기 후 시작
+            periodSeconds: 5         # 매 5초마다 검사
+            failureThreshold: 10     # 10번 실패 시 재시작
